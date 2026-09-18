@@ -1,3 +1,5 @@
+import { createServer } from "http";
+
 const TOOLS = [
   {
     name: "amplience_search",
@@ -20,7 +22,6 @@ function response(statusCode, obj, extraHeaders = {}) {
     statusCode,
     headers: {
       "Content-Type": "application/json",
-      // if you need to pull data from the browser/web (UI CodeMie is often web-based)
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type,Authorization",
@@ -30,9 +31,9 @@ function response(statusCode, obj, extraHeaders = {}) {
   };
 }
 
-// Mock for Amplience-logic. 
+// Mock for Amplience-logic.
 async function amplienceSearch({ query, locale, limit }) {
-  // TODO: fetch(...) в Amplience (Dynamic Content Search API / Delivery API / GraphQL)
+  // TODO: fetch(...) to Amplience (Dynamic Content Search API / Delivery API / GraphQL)
   return [
     { id: "cnt-001", title: `Result for "${query}"`, locale, snippet: "..." },
   ].slice(0, limit);
@@ -61,11 +62,10 @@ async function handleMcpCall(method, params) {
 
     const items = await amplienceSearch({ query, locale, limit });
 
-    // Рекомендуемый MCP-ответ: content[] с текстом
     const text =
       items.length === 0
-        ? `Ничего не нашла в Amplience по запросу: ${query}`
-        : `Нашла ${items.length} результатов в Amplience по запросу "${query}":\n` +
+        ? `Nothing found in Amplience for query: ${query}`
+        : `Found ${items.length} result(s) in Amplience for "${query}":\n` +
           items.map((x, i) => `${i + 1}. ${x.title} (${x.id})`).join("\n");
 
     return {
@@ -107,7 +107,7 @@ export const handler = async (event) => {
 
     const body = typeof bodyStr === "string" ? JSON.parse(bodyStr) : bodyStr;
 
-    // support of several popular formats:
+    // Support several popular formats:
     // 1) JSON-RPC style: { jsonrpc:"2.0", id, method, params }
     // 2) Simplified: { method, params }
     const method = body?.method;
@@ -142,3 +142,27 @@ export const handler = async (event) => {
     return response(500, { error: errObj });
   }
 };
+
+// HTTP server — keeps the process alive on Render
+const PORT = process.env.PORT || 3000;
+
+createServer(async (req, res) => {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const rawBody = Buffer.concat(chunks).toString("utf8");
+
+  const event = {
+    httpMethod: req.method,
+    headers: req.headers,
+    body: rawBody || "{}",
+    isBase64Encoded: false,
+    requestContext: { http: { method: req.method } },
+  };
+
+  const result = await handler(event);
+
+  res.writeHead(result.statusCode, result.headers);
+  res.end(result.body);
+}).listen(PORT, () => {
+  console.log(`MCP server listening on port ${PORT}`);
+});
