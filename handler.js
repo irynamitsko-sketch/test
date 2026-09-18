@@ -31,12 +31,39 @@ function response(statusCode, obj, extraHeaders = {}) {
   };
 }
 
-// Mock for Amplience-logic.
-async function amplienceSearch({ query, locale, limit }) {
-  // TODO: fetch(...) to Amplience (Dynamic Content Search API / Delivery API / GraphQL)
-  return [
-    { id: "cnt-001", title: `Result for "${query}"`, locale, snippet: "..." },
-  ].slice(0, limit);
+// Mock for Amplience-logic — returns randomised content items.
+async function amplienceSearch({ query, locale = "en-GB", limit = 5 }) {
+  const TYPES = ["banner", "article", "product", "hero", "promo", "blog-post", "landing"];
+  const TAGS  = ["sale", "new", "featured", "seasonal", "trending", "limited", "exclusive"];
+  const AUTHORS = ["Alice Johnson", "Bob Smith", "Carol White", "Dan Brown", "Eva Green"];
+
+  const rand = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+  const randDate = () => {
+    const d = new Date(Date.now() - randInt(0, 365) * 86400000);
+    return d.toISOString().split("T")[0];
+  };
+
+  const count = randInt(1, limit);
+  const results = Array.from({ length: count }, (_, i) => {
+    const type = rand(TYPES);
+    const id = `cnt-${String(randInt(100, 999))}-${type}`;
+    return {
+      id,
+      type,
+      title: `${query} — ${type} #${i + 1}`,
+      locale,
+      author: rand(AUTHORS),
+      tags: [rand(TAGS), rand(TAGS)].filter((v, i, a) => a.indexOf(v) === i),
+      publishedAt: randDate(),
+      snippet: `This is a mock ${type} content item matching the query "${query}". It contains relevant information about the topic.`,
+      score: parseFloat((Math.random() * 0.4 + 0.6).toFixed(2)), // relevance 0.60–1.00
+      url: `https://content.amplience.net/preview/${id}`,
+    };
+  });
+
+  // Sort by relevance score descending
+  return results.sort((a, b) => b.score - a.score);
 }
 
 async function handleMcpCall(method, params) {
