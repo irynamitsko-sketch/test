@@ -40,6 +40,25 @@ async function amplienceSearch({ query, locale, limit }) {
 }
 
 async function handleMcpCall(method, params) {
+  // MCP lifecycle: initialize
+  if (method === "initialize") {
+    return {
+      protocolVersion: "2024-11-05",
+      serverInfo: {
+        name: "amplience-mcp",
+        version: "1.0.0",
+      },
+      capabilities: {
+        tools: {},
+      },
+    };
+  }
+
+  // MCP lifecycle: ping / notifications (no response body needed, return empty)
+  if (method === "ping" || method === "notifications/initialized") {
+    return {};
+  }
+
   // MCP discovery
   if (method === "tools/list") {
     return { tools: TOOLS };
@@ -70,7 +89,7 @@ async function handleMcpCall(method, params) {
 
     return {
       content: [{ type: "text", text }],
-      items,
+      isError: false,
     };
   }
 
